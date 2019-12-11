@@ -1,9 +1,7 @@
 //! Get Git status
-use std::path::PathBuf;
-use std::process::Command;
+use std::{path::PathBuf, process::Command};
 
 use util::Status;
-
 
 static OPERATIONS: [(&str, &str); 6] = [
     ("rebase-merge", "REBASE"),
@@ -13,7 +11,6 @@ static OPERATIONS: [(&str, &str); 6] = [
     ("REVERT_HEAD", "REVERTING"),
     ("BISECT_LOG", "BISECTING"),
 ];
-
 
 /// Get the status for the cwd
 pub fn status(rootdir: PathBuf) -> Status {
@@ -26,12 +23,12 @@ pub fn status(rootdir: PathBuf) -> Status {
 /// Run `git status` and return its output.
 fn get_status() -> String {
     let result = Command::new("git")
-                .arg("status")
-                .arg("--porcelain=2")
-                .arg("--branch")
-                .arg("--untracked-files")
-                .output()
-                .expect("Failed to execute \"git\"");
+        .arg("status")
+        .arg("--porcelain=2")
+        .arg("--branch")
+        .arg("--untracked-files")
+        .output()
+        .expect("Failed to execute \"git\"");
 
     let output = String::from_utf8_lossy(&result.stdout).into_owned();
 
@@ -47,7 +44,7 @@ fn parse_status(status: &str) -> Status {
     let mut result = Status::new("git", "±");
 
     for line in status.lines() {
-        let parts: Vec<&str> = line.split(" ").collect();
+        let parts: Vec<&str> = line.split(' ').collect();
         // See https://git-scm.com/docs/git-status
         match parts[0] {
             "#" => match parts[1] {
@@ -55,19 +52,19 @@ fn parse_status(status: &str) -> Status {
                 "branch.ab" => {
                     result.ahead = parts[2].parse::<i32>().unwrap().abs() as u32;
                     result.behind = parts[3].parse::<i32>().unwrap().abs() as u32;
-                },
+                }
                 _ => (),
             },
             "1" | "2" => {
                 // We can ignore the submodule state as it is also indicated
                 // by ".M", so we already track it as a change.
-                if !parts[1].starts_with(".") {
+                if !parts[1].starts_with('.') {
                     result.staged += 1;
                 }
-                if !parts[1].ends_with(".") {
+                if !parts[1].ends_with('.') {
                     result.changed += 1;
                 }
-            },
+            }
             "u" => result.conflicts += 1,
             "?" => result.untracked += 1,
             _ => (),
@@ -76,7 +73,6 @@ fn parse_status(status: &str) -> Status {
 
     result
 }
-
 
 /// Look for files that indicate an ongoing operation (e.g., a merge)
 /// and update *list* accordingly
@@ -94,8 +90,10 @@ fn get_operations(list: &mut Vec<&str>, rootdir: &PathBuf) {
 
 #[cfg(test)]
 mod tests {
-    use std::env::temp_dir;
-    use std::fs::{DirBuilder,File};
+    use std::{
+        env::temp_dir,
+        fs::{DirBuilder, File},
+    };
 
     use super::*;
 
@@ -161,7 +159,10 @@ u UU <sub> <m1> <m2> <m3> <mW> <h1> <h2> <h3> <path>
 
         let mut path = rootdir.clone();
         path.push(".git");
-        DirBuilder::new().recursive(true).create(path.clone()).unwrap();
+        DirBuilder::new()
+            .recursive(true)
+            .create(path.clone())
+            .unwrap();
         path.push("MERGE_HEAD");
         File::create(path).unwrap();
 

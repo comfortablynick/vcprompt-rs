@@ -1,5 +1,5 @@
 [package]
-name = "vcprompt"
+name = "vcprompt-rs"
 version = "0.1.0"
 authors = ["Stefan Scherfke <stefan@sofa-rockers.org>"]
 description = "Version control information in your shell prompt"

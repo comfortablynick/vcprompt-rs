@@ -27,25 +27,26 @@ pub struct Status {
 
 impl Status {
     /// Create a new instance with all values set to `<unknown>` branch and `0`.
-    pub fn new<S>(name: S, symbol: S) -> Status where S: Into<String> {
+    pub fn new<S>(name: S, symbol: S) -> Status
+    where
+        S: Into<String>,
+    {
         Status {
-            name: name.into(),
-            symbol: symbol.into(),
-            branch: "<unknown>".to_string(),
-            ahead: 0,
-            behind: 0,
-            staged: 0,
-            changed: 0,
-            untracked: 0,
-            conflicts: 0,
+            name:       name.into(),
+            symbol:     symbol.into(),
+            branch:     "<unknown>".to_string(),
+            ahead:      0,
+            behind:     0,
+            staged:     0,
+            changed:    0,
+            untracked:  0,
+            conflicts:  0,
             operations: vec![],
         }
     }
 
+    /// Returns true if repo has no changes
     pub fn is_clean(&self) -> bool {
-        (self.staged == 0 &&
-         self.conflicts == 0 &&
-         self.changed == 0 &&
-         self.untracked == 0)
+        (self.staged == 0 && self.conflicts == 0 && self.changed == 0 && self.untracked == 0)
     }
 }
