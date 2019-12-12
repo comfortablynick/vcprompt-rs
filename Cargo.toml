@@ -1,12 +1,17 @@
 [package]
 name = "vcprompt-rs"
 version = "0.1.0"
-authors = ["Stefan Scherfke <stefan@sofa-rockers.org>"]
+authors = ["Nick Murphy <stefan@sofa-rockers.org>"]
 description = "Version control information in your shell prompt"
-documentation = "https://github.com/sscherfke/rust-vcprompt/blob/master/README.md"
-homepage = "https://github.com/sscherfke/rust-vcprompt"
-repository = "https://github.com/sscherfke/rust-vcprompt"
+documentation = "https://github.com/comfortablynick/vcprompt-rs/blob/master/README.md"
+homepage = "https://github.com/comfortablynick/vcprompt-rs"
+repository = "https://github.com/comfortablynick/vcprompt-rs"
 keywords = ["prompt", "bash", "zsh", "git", "hg"]
 categories = ["command-line-utilities"]
 readme = "README.md"
 license = "BSD-3-Clause"
+edition = "2018"
+
+[dependencies]
+structopt = "0.3"
+env_logger = "0.7"

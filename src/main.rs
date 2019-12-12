@@ -1,10 +1,10 @@
+mod cli;
 mod git;
 mod hg;
 mod util;
-
+use crate::{cli::Opt, util::Status};
+use log::debug;
 use std::{collections::HashMap, env, path::PathBuf};
-
-use util::Status;
 
 /// Available formatting styles
 enum OutputStyle {
@@ -230,31 +230,11 @@ fn format_minimal(status: &Status, variables: &HashMap<&str, String>) -> String 
     output
 }
 
-/// Print vcprompt's help message.
-///
-/// *name* is the name with which the program has been invoked.
-fn print_help(name: &str) {
-    println!(
-        "Usage: {} [OPTIONS]
-
-    Print version control information for use in your shell prompt.
-
-Options:
-  -h, --help        Show this message and exit.
-  -m, --minimal     Use minimal format instead of full format.",
-        name
-    );
-}
-
 fn main() {
-    let args: Vec<String> = std::env::args().collect();
+    let opt = Opt::parse_args();
+    debug!("Running with args: {:?}", opts);
 
-    if args.len() > 1 && ["-h", "--help"].contains(&args[1].as_str()) {
-        print_help(&args[0]);
-        return;
-    }
-
-    let style = if args.len() > 1 && ["-m", "--minimal"].contains(&args[1].as_str()) {
+    let style = if opt.minimal {
         OutputStyle::Minimal
     } else {
         OutputStyle::Detailed

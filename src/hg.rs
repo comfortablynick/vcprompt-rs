@@ -1,11 +1,7 @@
 //! Get Mercurial (hg) status
-use std::fs::File;
-use std::path::PathBuf;
-use std::process::Command;
-use std::io::prelude::*;
+use std::{fs::File, io::prelude::*, path::PathBuf, process::Command};
 
-use util::Status;
-
+use crate::util::Status;
 
 /// Get the status for the cwd
 pub fn status(rootdir: PathBuf) -> Status {
@@ -18,11 +14,11 @@ pub fn status(rootdir: PathBuf) -> Status {
 /// Run `hg status` and return its output.
 fn get_status() -> String {
     let result = Command::new("hg")
-                .arg("status")
-                .arg("--color=false")
-                .arg("--pager=false")
-                .output()
-                .expect("Failed to execute \"hg\"");
+        .arg("status")
+        .arg("--color=false")
+        .arg("--pager=false")
+        .output()
+        .expect("Failed to execute \"hg\"");
 
     let output = String::from_utf8_lossy(&result.stdout).into_owned();
 
@@ -57,7 +53,7 @@ fn get_branch(rootdir: &PathBuf) -> String {
             let mut contents = String::new();
             f.read_to_string(&mut contents).unwrap();
             contents.trim().to_string()
-        },
+        }
         Err(_) => "default".to_string(),
     }
 }
@@ -71,7 +67,7 @@ fn get_bookmark(rootdir: &PathBuf) -> String {
             let mut contents = String::new();
             f.read_to_string(&mut contents).unwrap();
             "*".to_string() + contents.trim()
-        },
+        }
         Err(_) => "".to_string(),
     }
 }

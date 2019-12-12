@@ -1,3 +1,4 @@
+Copyright (c) 2019 Nicholas Murphy
 Copyright (c) 2017 Stefan Scherfke
 
 Some rights reserved.

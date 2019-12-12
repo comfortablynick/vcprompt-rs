@@ -1,7 +1,7 @@
 //! Get Git status
 use std::{path::PathBuf, process::Command};
 
-use util::Status;
+use crate::util::Status;
 
 static OPERATIONS: [(&str, &str); 6] = [
     ("rebase-merge", "REBASE"),
