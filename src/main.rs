@@ -1,10 +1,13 @@
-mod cli;
 mod git;
 mod hg;
 mod util;
-use crate::{cli::Opt, util::Status};
+use crate::util::Status;
+use getopts::Options;
 use log::debug;
 use std::{collections::HashMap, env, path::PathBuf};
+
+const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+const DESCRIPTION: &'static str = env!("CARGO_PKG_DESCRIPTION");
 
 /// Available formatting styles
 enum OutputStyle {
@@ -230,11 +233,46 @@ fn format_minimal(status: &Status, variables: &HashMap<&str, String>) -> String 
     output
 }
 
-fn main() {
-    let opt = Opt::parse_args();
-    debug!("Running with args: {:?}", opts);
+fn print_usage(program: &str, opts: Options) {
+    let brief = format!("Usage: {} [options]\n\n{}", program, DESCRIPTION);
+    print!("{}", opts.usage(&brief));
+}
 
-    let style = if opt.minimal {
+fn main() -> Result<(), std::io::Error> {
+    let args = env::args().collect::<Vec<String>>();
+    let program = args[0].clone();
+    let mut opts = Options::new();
+    // Build options object
+    opts.optflag("h", "help", "print this help message and exit")
+        .optflag("V", "version", "print version info and exit")
+        .optflag("m", "minimal", "use minimal format instead of full")
+        .optflagmulti(
+            "v",
+            "verbose",
+            "increase debug verbosity (-v, -vv, -vvv, etc.)",
+        );
+    let matches = opts.parse(&args[1..]).unwrap();
+    if matches.opt_present("h") {
+        print_usage(&program, opts);
+        return Ok(());
+    }
+    if matches.opt_present("V") {
+        println!("{} v{}", program, VERSION);
+        return Ok(());
+    }
+
+    env_logger::Builder::from_env(env_logger::Env::new().default_filter_or(
+        match matches.opt_count("v") {
+            0 => "warn",
+            1 => "info",
+            2 => "debug",
+            _ => "trace",
+        },
+    ))
+    .init();
+
+    debug!("Running with args: {:?}", &args[1..]);
+    let style = if matches.opt_present("m") {
         OutputStyle::Minimal
     } else {
         OutputStyle::Detailed
@@ -244,4 +282,5 @@ fn main() {
     if let Some(status) = vcs.get_status(rootdir) {
         print_result(&status, style);
     }
+    Ok(())
 }
