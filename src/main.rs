@@ -42,10 +42,14 @@ impl VCContext {
         ]
     }
 
-    pub fn new(vcs: VCS, rootdir: PathBuf) -> Self {
+    /// Create new instance of VCContext
+    pub fn new<P>(vcs: VCS, rootdir: P) -> Self
+    where
+        P: Into<PathBuf>,
+    {
         Self {
-            system: vcs,
-            rootdir,
+            system:  vcs,
+            rootdir: rootdir.into(),
         }
     }
 
@@ -257,7 +261,7 @@ fn format_minimal(status: &Status, variables: &HashMap<&str, String>) -> String 
 
 fn print_usage(program: &str, opts: Options) {
     let brief = format!("Usage: {} [options]\n\n{}", program, DESCRIPTION);
-    print!("{}", opts.usage(&brief));
+    eprint!("{}", opts.usage(&brief));
 }
 
 fn main() -> Result<(), std::io::Error> {
@@ -267,13 +271,21 @@ fn main() -> Result<(), std::io::Error> {
     // Build options object
     opts.optflag("h", "help", "print this help message and exit")
         .optflag("V", "version", "print version info and exit")
-        .optflag("m", "minimal", "use minimal format instead of full")
         .optflagmulti(
             "v",
             "verbose",
             "increase debug verbosity (-v, -vv, -vvv, etc.)",
-        );
-    let matches = opts.parse(&args[1..]).unwrap();
+        )
+        // program options
+        .optopt("d", "dir", "run on this dir instead of cwd", "DIR")
+        .optflag("m", "minimal", "use minimal format instead of full");
+    let matches = match opts.parse(&args[1..]) {
+        Ok(m) => m,
+        Err(e) => {
+            eprintln!("{}\n\n{}", e, opts.short_usage(&program));
+            std::process::exit(1);
+        }
+    };
     if matches.opt_present("h") {
         print_usage(&program, opts);
         return Ok(());
@@ -299,6 +311,11 @@ fn main() -> Result<(), std::io::Error> {
     } else {
         OutputStyle::Detailed
     };
+
+    if let Some(dir) = matches.opt_str("d") {
+        debug!("Changing dir to {}", dir);
+        env::set_current_dir(dir)?;
+    }
 
     if let Some(vcs) = get_vcs() {
         if let Some(status) = vcs.get_status() {

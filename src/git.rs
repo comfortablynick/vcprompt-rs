@@ -1,7 +1,6 @@
 //! Get Git status
-use std::{path::PathBuf, process::Command};
-
-use crate::util::Status;
+use crate::util::{exec, Status};
+use std::path::PathBuf;
 
 static OPERATIONS: [(&str, &str); 6] = [
     ("rebase-merge", "REBASE"),
@@ -22,20 +21,18 @@ pub fn status(rootdir: PathBuf) -> Status {
 
 /// Run `git status` and return its output.
 fn get_status() -> String {
-    let result = Command::new("git")
-        .arg("status")
-        .arg("--porcelain=2")
-        .arg("--branch")
-        .arg("--untracked-files")
-        .output()
-        .expect("Failed to execute \"git\"");
-
+    let result = exec(&[
+        "git",
+        "status",
+        "--porcelain=2",
+        "--branch",
+        "--untracked-files=normal",
+    ])
+    .expect("Failed to execute \"git\"");
     let output = String::from_utf8_lossy(&result.stdout).into_owned();
-
     if !result.status.success() {
         panic!("git status failed: {}", &output);
     }
-
     output
 }
 
