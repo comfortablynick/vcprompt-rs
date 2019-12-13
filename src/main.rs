@@ -16,19 +16,43 @@ enum OutputStyle {
 }
 
 /// Supported version control systems
-#[derive(Clone)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum VCS {
     Git,
     Hg,
-    None,
 }
 
-impl VCS {
-    fn get_status(self, rootdir: Option<PathBuf>) -> Option<Status> {
-        match self {
-            VCS::Git => Some(git::status(rootdir.unwrap())),
-            VCS::Hg => Some(hg::status(rootdir.unwrap())),
-            VCS::None => None,
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct VCContext {
+    system:  VCS,
+    rootdir: PathBuf,
+}
+
+impl VCContext {
+    pub fn defaults() -> [VCContext; 2] {
+        [
+            VCContext {
+                system:  VCS::Git,
+                rootdir: PathBuf::from(".git/HEAD"),
+            },
+            VCContext {
+                system:  VCS::Hg,
+                rootdir: PathBuf::from(".hg/00changelog.i"),
+            },
+        ]
+    }
+
+    pub fn new(vcs: VCS, rootdir: PathBuf) -> Self {
+        Self {
+            system: vcs,
+            rootdir,
+        }
+    }
+
+    fn get_status(self) -> Option<Status> {
+        match self.system {
+            VCS::Git => Some(git::status(self.rootdir)),
+            VCS::Hg => Some(hg::status(self.rootdir)),
         }
     }
 }
@@ -37,21 +61,19 @@ impl VCS {
 ///
 /// This functions works for nest (sub) repos and always returns
 /// the most inner repository type.
-fn get_vcs() -> (VCS, Option<PathBuf>) {
-    let vcs_files = [(VCS::Git, ".git/HEAD"), (VCS::Hg, ".hg/00changelog.i")];
-
-    let mut cwd = Some(env::current_dir().unwrap());
+fn get_vcs() -> Option<VCContext> {
+    let mut cwd = env::current_dir().ok();
     while let Some(path) = cwd {
-        for &(ref vcs, vcs_file) in vcs_files.iter() {
+        for def in VCContext::defaults().iter() {
             let mut fname = path.clone();
-            fname.push(vcs_file);
+            fname.push(&def.rootdir);
             if fname.exists() {
-                return ((*vcs).clone(), Some(path));
+                return Some(VCContext::new(def.system, path));
             }
         }
         cwd = path.parent().map(PathBuf::from);
     }
-    (VCS::None, None)
+    None
 }
 
 /// Format and print the current VC status
@@ -278,9 +300,10 @@ fn main() -> Result<(), std::io::Error> {
         OutputStyle::Detailed
     };
 
-    let (vcs, rootdir) = get_vcs();
-    if let Some(status) = vcs.get_status(rootdir) {
-        print_result(&status, style);
+    if let Some(vcs) = get_vcs() {
+        if let Some(status) = vcs.get_status() {
+            print_result(&status, style);
+        }
     }
     Ok(())
 }
