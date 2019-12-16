@@ -1,6 +1,6 @@
 //! Commonly used utilities
+use anyhow::{format_err, Context, Result};
 use std::{
-    io,
     process::{Command, Output, Stdio},
     str,
 };
@@ -14,6 +14,8 @@ pub struct Status {
     pub symbol:     String,
     /// The branch name
     pub branch:     String,
+    /// Commit hash
+    pub commit:     String,
     /// Number of revisions we are ahead of upstream
     pub ahead:      u32,
     /// Number of revisions we are behind upstream
@@ -39,7 +41,8 @@ impl Status {
         Status {
             name:       name.into(),
             symbol:     symbol.into(),
-            branch:     "<unknown>".to_string(),
+            branch:     "<unknown>".into(),
+            commit:     String::with_capacity(40), // Should be max length of git commit hash
             ahead:      0,
             behind:     0,
             staged:     0,
@@ -59,21 +62,21 @@ impl Status {
 /// Spawn subprocess for `cmd` and access stdout/stderr
 ///
 /// Fails if process output != 0
-pub fn exec(cmd: &[&str]) -> io::Result<Output> {
+pub fn exec(cmd: &[&str]) -> Result<Output> {
     let command = Command::new(&cmd[0])
-        .args(cmd.get(1..).expect("missing args in cmd"))
+        .args(cmd.get(1..).context("missing args in command")?)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()?;
     let result = command.wait_with_output()?;
 
     if !result.status.success() {
-        return Err(io::Error::new(
-            io::ErrorKind::Other,
+        format_err!(
+            "{}",
             str::from_utf8(&result.stderr)
                 .unwrap_or("cmd returned non-zero status")
-                .trim_end(),
-        ));
+                .trim_end()
+        );
     }
     Ok(result)
 }

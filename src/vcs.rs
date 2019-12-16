@@ -1,4 +1,5 @@
 use crate::{git, hg, util::Status};
+use anyhow::Result;
 use std::{env, path::PathBuf};
 
 /// Supported version control systems
@@ -58,10 +59,10 @@ impl VCContext {
         None
     }
 
-    pub fn get_status(self) -> Option<Status> {
+    pub fn get_status(self) -> Result<Status> {
         match self.system {
-            VCS::Git => Some(git::status(self.rootdir)),
-            VCS::Hg => Some(hg::status(self.rootdir)),
+            VCS::Git => git::status(self.rootdir),
+            VCS::Hg => hg::status(self.rootdir),
         }
     }
 }

@@ -1,32 +1,29 @@
 //! Get Mercurial (hg) status
-use std::{fs::File, io::prelude::*, path::PathBuf, process::Command};
+use anyhow::{format_err, Context, Result};
+use log::debug;
+use std::{fs::File, io::prelude::*, path::PathBuf};
 
-use crate::util::Status;
+use crate::util::{exec, Status};
 
 /// Get the status for the cwd
-pub fn status(rootdir: PathBuf) -> Status {
-    let status_str = get_status();
+pub fn status(rootdir: PathBuf) -> Result<Status> {
+    let status_str = get_status()?;
+    debug!("Status str: {:?}", status_str);
     let mut status = parse_status(&status_str);
-    status.branch = get_branch(&rootdir) + &get_bookmark(&rootdir);
-    status
+    status.branch = get_branch(&rootdir)? + &get_bookmark(&rootdir);
+    Ok(status)
 }
 
 /// Run `hg status` and return its output.
-fn get_status() -> String {
-    let result = Command::new("hg")
-        .arg("status")
-        .arg("--color=false")
-        .arg("--pager=false")
-        .output()
-        .expect("Failed to execute \"hg\"");
-
+fn get_status() -> Result<String> {
+    let result = exec(&["hg", "status", "--color=false", "--pager=false"])
+        .context("Failed to execute \"hg\"")?;
     let output = String::from_utf8_lossy(&result.stdout).into_owned();
 
     if !result.status.success() {
-        panic!("git status failed: {}", &output);
+        format_err!("hg status failed: {}", &output);
     }
-
-    output
+    Ok(output)
 }
 
 /// Parse the output string of `get_status()`.
@@ -40,21 +37,22 @@ fn parse_status(status: &str) -> Status {
             _ => (),
         }
     }
-
     result
 }
 
 /// Return the current branch
-fn get_branch(rootdir: &PathBuf) -> String {
+// fn get_branch<P: Into<PathBuf>>(rootdir: P) -> String {
+fn get_branch(rootdir: &PathBuf) -> Result<String> {
     let mut path = rootdir.clone();
     path.push(".hg/branch");
+    debug!("Attempting to find branch at {:?}", path);
     match File::open(path) {
         Ok(mut f) => {
-            let mut contents = String::new();
-            f.read_to_string(&mut contents).unwrap();
-            contents.trim().to_string()
+            let mut contents = String::with_capacity(20);
+            f.read_to_string(&mut contents)?;
+            Ok(contents.trim().to_string())
         }
-        Err(_) => "default".to_string(),
+        Err(_) => Ok("default".to_string()),
     }
 }
 

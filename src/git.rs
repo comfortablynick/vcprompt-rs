@@ -1,5 +1,6 @@
 //! Get Git status
 use crate::util::{exec, Status};
+use anyhow::{format_err, Context, Result};
 use std::path::PathBuf;
 
 static OPERATIONS: [(&str, &str); 6] = [
@@ -12,15 +13,16 @@ static OPERATIONS: [(&str, &str); 6] = [
 ];
 
 /// Get the status for the cwd
-pub fn status(rootdir: PathBuf) -> Status {
-    let status = get_status();
+pub fn status(rootdir: PathBuf) -> Result<Status> {
+    let status = get_status()?;
     let mut result = parse_status(&status);
     get_operations(&mut result.operations, &rootdir);
-    result
+    Ok(result)
 }
 
+// fn get_diff() -> Result<>
 /// Run `git status` and return its output.
-fn get_status() -> String {
+fn get_status() -> Result<String> {
     let result = exec(&[
         "git",
         "status",
@@ -28,24 +30,25 @@ fn get_status() -> String {
         "--branch",
         "--untracked-files=normal",
     ])
-    .expect("Failed to execute \"git\"");
+    .context("Failed to execute \"git\"")?;
     let output = String::from_utf8_lossy(&result.stdout).into_owned();
     if !result.status.success() {
-        panic!("git status failed: {}", &output);
+        format_err!("git status failed: {}", output);
     }
-    output
+    Ok(output)
 }
 
 /// Parse the output string of `get_status()`.
 fn parse_status(status: &str) -> Status {
-    let mut result = Status::new("git", "±");
+    let mut result = Status::new("git", "");
 
     for line in status.lines() {
         let parts: Vec<&str> = line.split(' ').collect();
         // See https://git-scm.com/docs/git-status
         match parts[0] {
             "#" => match parts[1] {
-                "branch.head" => result.branch = parts[2].to_string(),
+                "branch.head" => result.branch = parts.get(2).unwrap_or(&"<unknown>").to_string(),
+                "branch.oid" => result.commit = parts.get(2).unwrap_or(&"<unknown>").to_string(),
                 "branch.ab" => {
                     result.ahead = parts[2].parse::<i32>().unwrap().abs() as u32;
                     result.behind = parts[3].parse::<i32>().unwrap().abs() as u32;

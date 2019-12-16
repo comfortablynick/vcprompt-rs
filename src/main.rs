@@ -3,20 +3,13 @@ mod hg;
 mod util;
 mod vcs;
 use crate::{util::Status, vcs::VCContext};
+use anyhow::{Context, Result};
 use getopts::Options;
 use log::debug;
-// use snafu::{OptionExt, ResultExt, Snafu};
-use snafu::Snafu;
 use std::{collections::HashMap, env};
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 const DESCRIPTION: &'static str = env!("CARGO_PKG_DESCRIPTION");
-type Result<T, E = Error> = std::result::Result<T, E>;
-
-#[derive(Debug, Snafu)]
-enum Error {
-    Missing,
-}
 
 /// Available formatting styles
 enum OutputStyle {
@@ -112,7 +105,6 @@ fn format(status: &Status) -> Result<String> {
             *v = val;
         }
     }
-    // let find_key = |v: Vec<(&str, String)>, s: &str| v.iter().find(|x| x.0 == s).unwrap().1;
     while let Some(c) = fmt_string.next() {
         if c == '%' {
             continue;
@@ -122,7 +114,7 @@ fn format(status: &Status) -> Result<String> {
                 &variables
                     .iter()
                     .find(|x| x.0 == "VCP_BRANCH")
-                    .ok_or(Error::Missing)?
+                    .context("Missing VCP_BRANCH")?
                     .1
                     .replace("{value}", &status.branch),
             ),
@@ -130,7 +122,7 @@ fn format(status: &Status) -> Result<String> {
                 &variables
                     .iter()
                     .find(|x| x.0 == "VCP_NAME")
-                    .ok_or(Error::Missing)?
+                    .context("Missing VCP_NAME")?
                     .1
                     .replace("{value}", &status.name)
                     .replace("{symbol}", &status.symbol),
@@ -335,13 +327,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if let Some(vcs) = VCContext::get_vcs() {
-        if let Some(status) = vcs.get_status() {
-            if matches.opt_present("test") {
-                println!("{}", format(&status)?);
-                return Ok(());
-            }
-            println!("{}", print_result(&status, style)?);
+        debug!("{:?}", vcs);
+        let status = vcs.get_status()?;
+        debug!("Status: {:#?}", &status);
+
+        if matches.opt_present("test") {
+            println!("{}", format(&status)?);
+            return Ok(());
         }
+        println!("{}", print_result(&status, style)?);
     }
     Ok(())
 }
