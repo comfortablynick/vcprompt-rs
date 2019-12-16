@@ -5,10 +5,18 @@ mod vcs;
 use crate::{util::Status, vcs::VCContext};
 use getopts::Options;
 use log::debug;
+// use snafu::{OptionExt, ResultExt, Snafu};
+use snafu::Snafu;
 use std::{collections::HashMap, env};
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 const DESCRIPTION: &'static str = env!("CARGO_PKG_DESCRIPTION");
+type Result<T, E = Error> = std::result::Result<T, E>;
+
+#[derive(Debug, Snafu)]
+enum Error {
+    Missing,
+}
 
 /// Available formatting styles
 enum OutputStyle {
@@ -17,8 +25,8 @@ enum OutputStyle {
 }
 
 /// Format and print the current VC status
-fn print_result(status: &Status, style: OutputStyle) {
-    let colors: HashMap<&str, &str> = [
+fn print_result(status: &Status, style: OutputStyle) -> Result<String> {
+    let colors: [(&str, &str); 10] = [
         ("{reset}", "\x1B[00m"),
         ("{bold}", "\x1B[01m"),
         ("{black}", "\x1B[30m"),
@@ -29,11 +37,7 @@ fn print_result(status: &Status, style: OutputStyle) {
         ("{magenta}", "\x1B[35m"),
         ("{cyan}", "\x1B[36m"),
         ("{white}", "\x1B[37m"),
-    ]
-    .iter()
-    .cloned()
-    .collect();
-
+    ];
     let mut variables: HashMap<&str, String> = [
         ("VCP_PREFIX", " "),
         ("VCP_SUFFIX", "{reset}"),
@@ -60,19 +64,89 @@ fn print_result(status: &Status, style: OutputStyle) {
     }
 
     let mut output = match style {
-        OutputStyle::Detailed => format_full(&status, &variables),
-        OutputStyle::Minimal => format_minimal(&status, &variables),
+        OutputStyle::Detailed => format_full(&status, &variables)?,
+        OutputStyle::Minimal => format_minimal(&status, &variables)?,
     };
 
     for (k, v) in colors.iter() {
         output = output.replace(k, v);
     }
-    println!("{}", output);
+    Ok(output)
+}
+
+fn format(status: &Status) -> Result<String> {
+    let mut output = String::with_capacity(100);
+    let mut fmt_string = "%n%b%t|%l".chars();
+    let colors: [(&str, &str); 10] = [
+        ("{reset}", "\x1B[00m"),
+        ("{bold}", "\x1B[01m"),
+        ("{black}", "\x1B[30m"),
+        ("{red}", "\x1B[31m"),
+        ("{green}", "\x1B[32m"),
+        ("{yellow}", "\x1B[33m"),
+        ("{blue}", "\x1B[34m"),
+        ("{magenta}", "\x1B[35m"),
+        ("{cyan}", "\x1B[36m"),
+        ("{white}", "\x1B[37m"),
+    ];
+    let mut variables: Vec<(&str, String)> = vec![
+        ("VCP_PREFIX", " "),
+        ("VCP_SUFFIX", "{reset}"),
+        ("VCP_SEPARATOR", "|"),
+        ("VCP_NAME", "{symbol}"), // value|symbol
+        ("VCP_BRANCH", "{blue}{value}{reset}"),
+        ("VCP_OPERATION", "{red}{value}{reset}"),
+        ("VCP_BEHIND", "↓{value}"),
+        ("VCP_AHEAD", "↑{value}"),
+        ("VCP_STAGED", "{red}●{value}"),
+        ("VCP_CONFLICTS", "{red}✖{value}"),
+        ("VCP_CHANGED", "{blue}✚{value}"),
+        ("VCP_UNTRACKED", "{reset}…{value}"),
+        ("VCP_CLEAN", "{green}{bold}✔"),
+    ]
+    .iter()
+    .map(|&(k, v)| (k, v.to_string()))
+    .collect();
+    for (k, v) in variables.iter_mut() {
+        if let Ok(val) = env::var(k) {
+            *v = val;
+        }
+    }
+    // let find_key = |v: Vec<(&str, String)>, s: &str| v.iter().find(|x| x.0 == s).unwrap().1;
+    while let Some(c) = fmt_string.next() {
+        if c == '%' {
+            continue;
+        }
+        match &c {
+            'b' => output.push_str(
+                &variables
+                    .iter()
+                    .find(|x| x.0 == "VCP_BRANCH")
+                    .ok_or(Error::Missing)?
+                    .1
+                    .replace("{value}", &status.branch),
+            ),
+            'n' => output.push_str(
+                &variables
+                    .iter()
+                    .find(|x| x.0 == "VCP_NAME")
+                    .ok_or(Error::Missing)?
+                    .1
+                    .replace("{value}", &status.name)
+                    .replace("{symbol}", &status.symbol),
+            ),
+            _ => (),
+        }
+    }
+    for (k, v) in colors.iter() {
+        output = output.replace(k, v);
+    }
+    Ok(output)
 }
 
 /// Format *status* in detailed style
 /// (`{name}{branch}{branch tracking}|{local status}`).
-fn format_full(status: &Status, variables: &HashMap<&str, String>) -> String {
+fn format_full(status: &Status, variables: &HashMap<&str, String>) -> Result<String> {
     let mut output = String::with_capacity(100);
     output.push_str(&variables.get("VCP_PREFIX").unwrap());
     output.push_str(
@@ -150,13 +224,16 @@ fn format_full(status: &Status, variables: &HashMap<&str, String>) -> String {
         output.push_str(&variables.get("VCP_CLEAN").unwrap());
     }
     output.push_str(&variables.get("VCP_SUFFIX").unwrap());
-
-    output
+    Ok(output)
 }
 
 /// Format *status* in minimal style
 /// (`{branch}{colored_symbol}`).
-fn format_minimal(status: &Status, variables: &HashMap<&str, String>) -> String {
+fn format_minimal(
+    status: &Status,
+    variables: &HashMap<&str, String>,
+    // ) -> Result<String, Box<dyn std::error::Error>> {
+) -> Result<String> {
     let mut output = String::with_capacity(100);
     output.push_str(&variables.get("VCP_PREFIX").unwrap());
     output.push_str(
@@ -192,15 +269,18 @@ fn format_minimal(status: &Status, variables: &HashMap<&str, String>) -> String 
     output.push_str("{reset}");
     output.push_str(&variables.get("VCP_SUFFIX").unwrap());
 
-    output
+    Ok(output)
 }
 
 fn print_usage(program: &str, opts: Options) {
-    let brief = format!("Usage: {} [options]\n\n{}", program, DESCRIPTION);
+    let brief = format!(
+        "Usage: {} [options] <DIRECTORY>\n\n{}",
+        program, DESCRIPTION
+    );
     eprint!("{}", opts.usage(&brief));
 }
 
-fn main() -> Result<(), std::io::Error> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = env::args().collect::<Vec<String>>();
     let program = args[0].clone();
     let mut opts = Options::new();
@@ -213,8 +293,9 @@ fn main() -> Result<(), std::io::Error> {
             "increase debug verbosity (-v, -vv, -vvv, etc.)",
         )
         // program options
-        .optopt("d", "dir", "run on this dir instead of cwd", "DIR")
-        .optflag("m", "minimal", "use minimal format instead of full");
+        // .optopt("d", "dir", "run on this dir instead of cwd", "DIR")
+        .optflag("m", "minimal", "use minimal format instead of full")
+        .optflag("t", "test", "use test function");
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
         Err(e) => {
@@ -248,14 +329,18 @@ fn main() -> Result<(), std::io::Error> {
         OutputStyle::Detailed
     };
 
-    if let Some(dir) = matches.opt_str("d") {
+    if let Some(dir) = matches.free.get(0) {
         debug!("Changing dir to {}", dir);
         env::set_current_dir(dir)?;
     }
 
     if let Some(vcs) = VCContext::get_vcs() {
         if let Some(status) = vcs.get_status() {
-            print_result(&status, style);
+            if matches.opt_present("test") {
+                println!("{}", format(&status)?);
+                return Ok(());
+            }
+            println!("{}", print_result(&status, style)?);
         }
     }
     Ok(())

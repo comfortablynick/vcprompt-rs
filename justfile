@@ -31,6 +31,9 @@ help:
 rb +args='':
     ./target/release/{{bin_name}} {{args}}
 
+bench:
+    hyperfine -w 100 'vcprompt-rs ~/src/neovim' 'vctest -f "%b %r %p %u %m" ~/src/neovim'
+
 test:
     cargo test
 

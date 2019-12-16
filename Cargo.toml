@@ -39,3 +39,4 @@ overflow-checks = false
 getopts = "0.2"
 log = "0.4"
 env_logger = "0.7"
+snafu = "0.6"
