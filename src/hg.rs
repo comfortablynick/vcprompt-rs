@@ -1,5 +1,5 @@
 //! Get Mercurial (hg) status
-use crate::{status::Status, util::exec};
+use crate::{status::Status, util::exec, vcs::VCS};
 use anyhow::{format_err, Context, Result};
 use log::debug;
 use std::{fs::File, io::prelude::*, path::PathBuf};
@@ -27,7 +27,7 @@ fn get_status() -> Result<String> {
 
 /// Parse the output string of `get_status()`.
 fn parse_status(status: &str) -> Status {
-    let mut result = Status::new("hg", "☿");
+    let mut result = Status::new(VCS::Hg);
 
     for line in status.lines() {
         match line.split(" ").next() {
@@ -40,7 +40,6 @@ fn parse_status(status: &str) -> Status {
 }
 
 /// Return the current branch
-// fn get_branch<P: Into<PathBuf>>(rootdir: P) -> String {
 fn get_branch(rootdir: &PathBuf) -> Result<String> {
     let mut path = rootdir.clone();
     path.push(".hg/branch");
@@ -84,7 +83,7 @@ C clean.txt
 ! deleted.txt
 I ignored.txt
 ";
-        let mut expected = Status::new("hg", "☿");
+        let mut expected = Status::new(VCS::Hg);
         expected.branch = "<unknown>".to_string();
         expected.ahead = 0;
         expected.behind = 0;
@@ -97,6 +96,6 @@ I ignored.txt
 
     #[test]
     fn parse_status_clean() {
-        assert_eq!(parse_status(""), Status::new("hg", "☿"));
+        assert_eq!(parse_status(""), Status::new(VCS::Hg));
     }
 }

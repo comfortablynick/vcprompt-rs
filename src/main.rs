@@ -33,7 +33,7 @@ fn print_result(status: &Status, style: OutputStyle) -> Result<String> {
         ("{white}", "\x1B[37m"),
     ];
     let mut variables: HashMap<&str, String> = [
-        ("VCP_PREFIX", " "),
+        ("VCP_PREFIX", ""),
         ("VCP_SUFFIX", "{reset}"),
         ("VCP_SEPARATOR", "|"),
         ("VCP_NAME", "{symbol}"), // value|symbol
@@ -92,9 +92,9 @@ fn format(status: &Status) -> Result<String> {
         ("VCP_OPERATION", "{red}{value}{reset}"),
         ("VCP_BEHIND", "↓{value}"),
         ("VCP_AHEAD", "↑{value}"),
-        ("VCP_STAGED", "{red}●{value}"),
+        ("VCP_STAGED", "{blue}✚{value}"),
+        ("VCP_CHANGED", "{red}●{value}"),
         ("VCP_CONFLICTS", "{red}✖{value}"),
-        ("VCP_CHANGED", "{blue}✚{value}"),
         ("VCP_UNTRACKED", "{reset}…{value}"),
         ("VCP_CLEAN", "{green}{bold}✔"),
     ]
@@ -125,7 +125,7 @@ fn format(status: &Status) -> Result<String> {
                     .find(|x| x.0 == "VCP_NAME")
                     .context("Missing VCP_NAME")?
                     .1
-                    .replace("{value}", &status.name)
+                    .replace("{value}", &status.name.to_string())
                     .replace("{symbol}", &status.symbol),
             ),
             _ => (),
@@ -146,7 +146,7 @@ fn format_full(status: &Status, variables: &HashMap<&str, String>) -> Result<Str
         &variables
             .get("VCP_NAME")
             .unwrap()
-            .replace("{value}", &status.name)
+            .replace("{value}", &status.name.to_string())
             .replace("{symbol}", &status.symbol),
     );
     output.push_str(
@@ -229,12 +229,15 @@ fn format_minimal(
 ) -> Result<String> {
     let mut output = String::with_capacity(100);
     output.push_str(&variables.get("VCP_PREFIX").unwrap());
-    output.push_str(
-        &variables
-            .get("VCP_BRANCH")
-            .unwrap()
-            .replace("{value}", &status.branch),
-    );
+    // output.push_str(
+    //     &variables
+    //         .get("VCP_BRANCH")
+    //         .unwrap()
+    //         .replace("{value}", &status.branch),
+    // );
+    output.push_str("{cyan}(");
+    output.push_str(&status.branch);
+    output.push_str("){reset}");
     if status.behind > 0 {
         output.push_str(
             &variables
@@ -254,11 +257,11 @@ fn format_minimal(
     if status.is_clean() {
         output.push_str("{bold}{green}");
     } else if status.staged > 0 {
-        output.push_str("{bold}{red}");
-    } else {
         output.push_str("{bold}{yellow}");
+    } else {
+        output.push_str("{bold}{red}");
     }
-    output.push_str(&status.symbol);
+    output.push_str(" *");
     output.push_str("{reset}");
     output.push_str(&variables.get("VCP_SUFFIX").unwrap());
 

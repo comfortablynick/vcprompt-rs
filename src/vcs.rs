@@ -1,12 +1,30 @@
 use crate::{git, hg, status::Status};
 use anyhow::Result;
-use std::{env, path::PathBuf};
+use std::{env, fmt, path::PathBuf};
 
 /// Supported version control systems
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum VCS {
     Git,
     Hg,
+}
+
+impl fmt::Display for VCS {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            VCS::Git => write!(f, "Git"),
+            VCS::Hg => write!(f, "Hg"),
+        }
+    }
+}
+
+impl VCS {
+    pub fn default_symbol(&self) -> &'static str {
+        match *self {
+            VCS::Git => "",
+            VCS::Hg => "☿",
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

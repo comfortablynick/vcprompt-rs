@@ -1,5 +1,5 @@
 //! Get Git status
-use crate::{status::Status, util::exec};
+use crate::{status::Status, util::exec, vcs::VCS};
 use anyhow::{format_err, Context, Result};
 use std::path::PathBuf;
 
@@ -40,7 +40,7 @@ fn get_status() -> Result<String> {
 
 /// Parse the output string of `get_status()`.
 fn parse_status(status: &str) -> Result<Status> {
-    let mut result = Status::new("git", "");
+    let mut result = Status::new(VCS::Git);
 
     for line in status.lines() {
         let mut parts = line.split(' ');
@@ -139,8 +139,8 @@ u UU <sub> <m1> <m2> <m3> <mW> <h1> <h2> <h3> <path>
 ? untracked.txt
 ! ignored.txt
 ";
-        let mut expected = Status::new("git", "±");
-        expected.branch = "master".to_string();
+        let mut expected = Status::new(VCS::Git);
+        expected.branch = "master".to_owned();
         expected.ahead = 1;
         expected.behind = 2;
         expected.staged = 14;
@@ -156,14 +156,14 @@ u UU <sub> <m1> <m2> <m3> <mW> <h1> <h2> <h3> <path>
 # branch.oid dc716b061d9a0bc6a59f4e02d72b9952cce28927
 # branch.head master
 ";
-        let mut expected = Status::new("git", "±");
-        expected.branch = "master".to_string();
+        let mut expected = Status::new(VCS::Git);
+        expected.branch = "master".to_owned();
         assert_eq!(parse_status(output).unwrap(), expected);
     }
 
     #[test]
     fn parse_status_emty() {
-        assert_eq!(parse_status("").unwrap(), Status::new("git", "±"));
+        assert_eq!(parse_status("").unwrap(), Status::new(VCS::Git));
     }
 
     #[test]

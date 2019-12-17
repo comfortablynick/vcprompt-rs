@@ -1,8 +1,10 @@
+use crate::vcs::VCS;
+
 /// The current VC status
 #[derive(PartialEq, Debug)]
 pub struct Status {
-    /// VCS name
-    pub name:       String,
+    /// Version control system
+    pub name:       VCS,
     /// VCS symbol
     pub symbol:     String,
     /// The branch name
@@ -26,14 +28,11 @@ pub struct Status {
 }
 
 impl Status {
-    /// Create a new instance with all values set to `<unknown>` branch and `0`.
-    pub fn new<S>(name: S, symbol: S) -> Status
-    where
-        S: Into<String>,
-    {
+    /// Create a new instance with all values set to default.
+    pub fn new(vcs: VCS) -> Status {
         Status {
-            name:       name.into(),
-            symbol:     symbol.into(),
+            name:       vcs,
+            symbol:     vcs.default_symbol().to_owned(),
             branch:     String::with_capacity(40),
             commit:     String::with_capacity(40), // Should be max length of git commit hash
             ahead:      0,
