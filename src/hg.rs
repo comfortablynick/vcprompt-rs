@@ -1,9 +1,8 @@
 //! Get Mercurial (hg) status
+use crate::{status::Status, util::exec};
 use anyhow::{format_err, Context, Result};
 use log::debug;
 use std::{fs::File, io::prelude::*, path::PathBuf};
-
-use crate::util::{exec, Status};
 
 /// Get the status for the cwd
 pub fn status(rootdir: PathBuf) -> Result<Status> {

@@ -22,7 +22,6 @@ codegen-units = 16
 panic = 'unwind'
 incremental = true
 overflow-checks = true
-target-cpu = 'native'
 
 [profile.release]
 opt-level = 3
@@ -34,6 +33,7 @@ codegen-units = 16
 panic = 'unwind'
 incremental = false
 overflow-checks = false
+target-cpu = 'native'
 
 [dependencies]
 getopts = "0.2"

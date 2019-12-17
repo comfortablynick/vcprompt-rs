@@ -1,4 +1,4 @@
-use crate::{git, hg, util::Status};
+use crate::{git, hg, status::Status};
 use anyhow::Result;
 use std::{env, path::PathBuf};
 

@@ -1,5 +1,5 @@
 //! Get Git status
-use crate::util::{exec, Status};
+use crate::{status::Status, util::exec};
 use anyhow::{format_err, Context, Result};
 use std::path::PathBuf;
 
@@ -15,7 +15,7 @@ static OPERATIONS: [(&str, &str); 6] = [
 /// Get the status for the cwd
 pub fn status(rootdir: PathBuf) -> Result<Status> {
     let status = get_status()?;
-    let mut result = parse_status(&status);
+    let mut result = parse_status(&status)?;
     get_operations(&mut result.operations, &rootdir);
     Ok(result)
 }
@@ -39,30 +39,46 @@ fn get_status() -> Result<String> {
 }
 
 /// Parse the output string of `get_status()`.
-fn parse_status(status: &str) -> Status {
+fn parse_status(status: &str) -> Result<Status> {
     let mut result = Status::new("git", "");
 
     for line in status.lines() {
-        let parts: Vec<&str> = line.split(' ').collect();
+        let mut parts = line.split(' ');
         // See https://git-scm.com/docs/git-status
-        match parts[0] {
-            "#" => match parts[1] {
-                "branch.head" => result.branch = parts.get(2).unwrap_or(&"<unknown>").to_string(),
-                "branch.oid" => result.commit = parts.get(2).unwrap_or(&"<unknown>").to_string(),
-                "branch.ab" => {
-                    result.ahead = parts[2].parse::<i32>().unwrap().abs() as u32;
-                    result.behind = parts[3].parse::<i32>().unwrap().abs() as u32;
+        match parts.next().unwrap_or("") {
+            "#" => match parts.next() {
+                Some("branch.head") => {
+                    result.branch = parts.next().unwrap_or(&"<unknown>").to_string()
+                }
+                Some("branch.oid") => {
+                    result.commit = parts.next().unwrap_or(&"<unknown>").to_string()
+                }
+                Some("branch.ab") => {
+                    result.ahead = parts
+                        .next()
+                        .unwrap_or("0")
+                        .parse::<i32>()
+                        .context("Failed to parse")?
+                        .abs() as u32;
+                    result.behind = parts
+                        .next()
+                        .unwrap_or("0")
+                        .parse::<i32>()
+                        .context("Failed to parse")?
+                        .abs() as u32;
                 }
                 _ => (),
             },
             "1" | "2" => {
-                // We can ignore the submodule state as it is also indicated
-                // by ".M", so we already track it as a change.
-                if !parts[1].starts_with('.') {
-                    result.staged += 1;
-                }
-                if !parts[1].ends_with('.') {
-                    result.changed += 1;
+                if let Some(status) = parts.next() {
+                    // We can ignore the submodule state as it is also indicated
+                    // by ".M", so we already track it as a change.
+                    if !status.starts_with('.') {
+                        result.staged += 1;
+                    }
+                    if !status.ends_with('.') {
+                        result.changed += 1;
+                    }
                 }
             }
             "u" => result.conflicts += 1,
@@ -70,8 +86,7 @@ fn parse_status(status: &str) -> Status {
             _ => (),
         }
     }
-
-    result
+    Ok(result)
 }
 
 /// Look for files that indicate an ongoing operation (e.g., a merge)
@@ -132,7 +147,7 @@ u UU <sub> <m1> <m2> <m3> <mW> <h1> <h2> <h3> <path>
         expected.changed = 11;
         expected.untracked = 1;
         expected.conflicts = 1;
-        assert_eq!(parse_status(output), expected);
+        assert_eq!(parse_status(output).unwrap(), expected);
     }
 
     #[test]
@@ -143,12 +158,12 @@ u UU <sub> <m1> <m2> <m3> <mW> <h1> <h2> <h3> <path>
 ";
         let mut expected = Status::new("git", "±");
         expected.branch = "master".to_string();
-        assert_eq!(parse_status(output), expected);
+        assert_eq!(parse_status(output).unwrap(), expected);
     }
 
     #[test]
     fn parse_status_emty() {
-        assert_eq!(parse_status(""), Status::new("git", "±"));
+        assert_eq!(parse_status("").unwrap(), Status::new("git", "±"));
     }
 
     #[test]

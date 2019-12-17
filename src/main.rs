@@ -1,8 +1,9 @@
 mod git;
 mod hg;
+mod status;
 mod util;
 mod vcs;
-use crate::{util::Status, vcs::VCContext};
+use crate::{status::Status, vcs::VCContext};
 use anyhow::{Context, Result};
 use getopts::Options;
 use log::debug;
