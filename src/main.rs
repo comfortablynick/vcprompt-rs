@@ -13,11 +13,12 @@ use std::{collections::HashMap, env};
 enum OutputStyle {
     Detailed,
     Minimal,
+    Formatted,
 }
 
 /// Format and print the current VC status
 fn print_result(status: &Status, style: OutputStyle) -> Result<String> {
-    let mut variables: HashMap<&str, String> = [
+    let variables: HashMap<&'static str, String> = [
         ("VCP_PREFIX", ""),
         ("VCP_SUFFIX", "{reset}"),
         ("VCP_SEPARATOR", "{reset}|"),
@@ -33,18 +34,14 @@ fn print_result(status: &Status, style: OutputStyle) -> Result<String> {
         ("VCP_CLEAN", "{green}{bold}✔"),
     ]
     .iter()
-    .map(|&(k, v)| (k, v.to_string()))
+    .map(|(k, v)| (*k, env::var(k).unwrap_or(v.to_string())))
     .collect();
-
-    for (k, v) in variables.iter_mut() {
-        if let Ok(val) = env::var(k) {
-            *v = val;
-        }
-    }
+    debug!("{:?}", variables);
 
     let mut output = match style {
         OutputStyle::Detailed => format_full(&status, &variables)?,
         OutputStyle::Minimal => format_minimal(&status, &variables)?,
+        OutputStyle::Formatted => format_from_string(&status, &variables)?,
     };
 
     for (k, v) in COLORS.iter() {
@@ -53,32 +50,13 @@ fn print_result(status: &Status, style: OutputStyle) -> Result<String> {
     Ok(output)
 }
 
-fn format(status: &Status) -> Result<String> {
+fn format_from_string(
+    status: &Status,
+    variables: &HashMap<&'static str, String>,
+) -> Result<String> {
     let mut output = String::with_capacity(100);
     let mut fmt_string = "%n%b%t|%l".chars();
-    let mut variables: Vec<(&str, String)> = vec![
-        ("VCP_PREFIX", " "),
-        ("VCP_SUFFIX", "{reset}"),
-        ("VCP_SEPARATOR", "|"),
-        ("VCP_NAME", "{symbol}"), // value|symbol
-        ("VCP_BRANCH", "{blue}{value}{reset}"),
-        ("VCP_OPERATION", "{red}{value}{reset}"),
-        ("VCP_BEHIND", "↓{value}"),
-        ("VCP_AHEAD", "↑{value}"),
-        ("VCP_STAGED", "{blue}✚{value}"),
-        ("VCP_CHANGED", "{red}●{value}"),
-        ("VCP_CONFLICTS", "{red}✖{value}"),
-        ("VCP_UNTRACKED", "{reset}…{value}"),
-        ("VCP_CLEAN", "{green}{bold}✔"),
-    ]
-    .iter()
-    .map(|&(k, v)| (k, v.to_string()))
-    .collect();
-    for (k, v) in variables.iter_mut() {
-        if let Ok(val) = env::var(k) {
-            *v = val;
-        }
-    }
+
     while let Some(c) = fmt_string.next() {
         if c == '%' {
             continue;
@@ -86,18 +64,14 @@ fn format(status: &Status) -> Result<String> {
         match &c {
             'b' => output.push_str(
                 &variables
-                    .iter()
-                    .find(|x| x.0 == "VCP_BRANCH")
-                    .context("Missing VCP_BRANCH")?
-                    .1
+                    .get("VCP_BRANCH")
+                    .unwrap()
                     .replace("{value}", &status.branch),
             ),
             'n' => output.push_str(
                 &variables
-                    .iter()
-                    .find(|x| x.0 == "VCP_NAME")
-                    .context("Missing VCP_NAME")?
-                    .1
+                    .get("VCP_NAME")
+                    .unwrap()
                     .replace("{value}", &status.name.to_string())
                     .replace("{symbol}", &status.symbol),
             ),
@@ -252,8 +226,14 @@ fn main() -> Result<()> {
             "increase debug verbosity (-v, -vv, -vvv, etc.)",
         )
         // program options
-        .optflag("m", "minimal", "use minimal format instead of full")
-        .optflag("t", "test", "use test function");
+        // TODO: make this non-optional when finished with testing
+        .optflagopt(
+            "f",
+            "format",
+            "format output using this printf-style string",
+            "FORMAT_STRING",
+        )
+        .optflag("m", "minimal", "use minimal format instead of full");
     let matches = match opts.parse(args) {
         Ok(m) => m,
         Err(e) => {
@@ -280,12 +260,12 @@ fn main() -> Result<()> {
     ))
     .init();
 
-    // TODO: check to see if this is only executed when
-    // log level == debug
-    debug!("Run with args: {:?}", std::env::args());
+    // debug!("Run with args: {:?}", std::env::args());
 
     let style = if matches.opt_present("m") {
         OutputStyle::Minimal
+    } else if matches.opt_present("f") {
+        OutputStyle::Formatted
     } else {
         OutputStyle::Detailed
     };
@@ -297,13 +277,10 @@ fn main() -> Result<()> {
 
     if let Some(vcs) = VCContext::get_vcs() {
         debug!("{:?}", vcs);
+
         let status = vcs.get_status()?;
         debug!("Status: {:#?}", &status);
 
-        if matches.opt_present("test") {
-            println!("{}", format(&status)?);
-            return Ok(());
-        }
         println!("{}", print_result(&status, style)?);
     }
     Ok(())
