@@ -3,14 +3,11 @@ mod hg;
 mod status;
 mod util;
 mod vcs;
-use crate::{status::Status, vcs::VCContext};
+use crate::{status::Status, util::globals::*, vcs::VCContext};
 use anyhow::{Context, Result};
 use getopts::Options;
 use log::debug;
 use std::{collections::HashMap, env};
-
-const VERSION: &'static str = env!("CARGO_PKG_VERSION");
-const DESCRIPTION: &'static str = env!("CARGO_PKG_DESCRIPTION");
 
 /// Available formatting styles
 enum OutputStyle {
@@ -20,29 +17,17 @@ enum OutputStyle {
 
 /// Format and print the current VC status
 fn print_result(status: &Status, style: OutputStyle) -> Result<String> {
-    let colors: [(&str, &str); 10] = [
-        ("{reset}", "\x1B[00m"),
-        ("{bold}", "\x1B[01m"),
-        ("{black}", "\x1B[30m"),
-        ("{red}", "\x1B[31m"),
-        ("{green}", "\x1B[32m"),
-        ("{yellow}", "\x1B[33m"),
-        ("{blue}", "\x1B[34m"),
-        ("{magenta}", "\x1B[35m"),
-        ("{cyan}", "\x1B[36m"),
-        ("{white}", "\x1B[37m"),
-    ];
     let mut variables: HashMap<&str, String> = [
         ("VCP_PREFIX", ""),
         ("VCP_SUFFIX", "{reset}"),
-        ("VCP_SEPARATOR", "|"),
+        ("VCP_SEPARATOR", "{reset}|"),
         ("VCP_NAME", "{symbol}"), // value|symbol
-        ("VCP_BRANCH", "{blue}{value}{reset}"),
+        ("VCP_BRANCH", "{cyan}{value}{reset}"),
         ("VCP_OPERATION", "{red}{value}{reset}"),
-        ("VCP_BEHIND", "↓{value}"),
-        ("VCP_AHEAD", "↑{value}"),
+        ("VCP_BEHIND", "⇣{value}"),
+        ("VCP_AHEAD", "⇡{value}"),
         ("VCP_STAGED", "{red}●{value}"),
-        ("VCP_CONFLICTS", "{red}✖{value}"),
+        ("VCP_CONFLICTS", "{red}‼{value}"),
         ("VCP_CHANGED", "{blue}✚{value}"),
         ("VCP_UNTRACKED", "{reset}…{value}"),
         ("VCP_CLEAN", "{green}{bold}✔"),
@@ -62,7 +47,7 @@ fn print_result(status: &Status, style: OutputStyle) -> Result<String> {
         OutputStyle::Minimal => format_minimal(&status, &variables)?,
     };
 
-    for (k, v) in colors.iter() {
+    for (k, v) in COLORS.iter() {
         output = output.replace(k, v);
     }
     Ok(output)
@@ -71,18 +56,6 @@ fn print_result(status: &Status, style: OutputStyle) -> Result<String> {
 fn format(status: &Status) -> Result<String> {
     let mut output = String::with_capacity(100);
     let mut fmt_string = "%n%b%t|%l".chars();
-    let colors: [(&str, &str); 10] = [
-        ("{reset}", "\x1B[00m"),
-        ("{bold}", "\x1B[01m"),
-        ("{black}", "\x1B[30m"),
-        ("{red}", "\x1B[31m"),
-        ("{green}", "\x1B[32m"),
-        ("{yellow}", "\x1B[33m"),
-        ("{blue}", "\x1B[34m"),
-        ("{magenta}", "\x1B[35m"),
-        ("{cyan}", "\x1B[36m"),
-        ("{white}", "\x1B[37m"),
-    ];
     let mut variables: Vec<(&str, String)> = vec![
         ("VCP_PREFIX", " "),
         ("VCP_SUFFIX", "{reset}"),
@@ -131,7 +104,7 @@ fn format(status: &Status) -> Result<String> {
             _ => (),
         }
     }
-    for (k, v) in colors.iter() {
+    for (k, v) in COLORS.iter() {
         output = output.replace(k, v);
     }
     Ok(output)
@@ -220,24 +193,22 @@ fn format_full(status: &Status, variables: &HashMap<&str, String>) -> Result<Str
     Ok(output)
 }
 
-/// Format *status* in minimal style
-/// (`{branch}{colored_symbol}`).
-fn format_minimal(
-    status: &Status,
-    variables: &HashMap<&str, String>,
-    // ) -> Result<String, Box<dyn std::error::Error>> {
-) -> Result<String> {
+/// Format status in minimal style
+fn format_minimal(status: &Status, variables: &HashMap<&str, String>) -> Result<String> {
     let mut output = String::with_capacity(100);
     output.push_str(&variables.get("VCP_PREFIX").unwrap());
-    // output.push_str(
-    //     &variables
-    //         .get("VCP_BRANCH")
-    //         .unwrap()
-    //         .replace("{value}", &status.branch),
-    // );
-    output.push_str("{cyan}(");
-    output.push_str(&status.branch);
-    output.push_str("){reset}");
+    output.push_str(
+        &variables
+            .get("VCP_BRANCH")
+            .unwrap()
+            .replace("{value}", &status.branch),
+    );
+    if status.staged > 0 {
+        output.push_str("{bold}{yellow}+{reset}");
+    }
+    if !status.is_clean() {
+        output.push_str("{red}*{reset}");
+    }
     if status.behind > 0 {
         output.push_str(
             &variables
@@ -254,15 +225,6 @@ fn format_minimal(
                 .replace("{value}", &status.ahead.to_string()),
         );
     }
-    if status.is_clean() {
-        output.push_str("{bold}{green}");
-    } else if status.staged > 0 {
-        output.push_str("{bold}{yellow}");
-    } else {
-        output.push_str("{bold}{red}");
-    }
-    output.push_str(" *");
-    output.push_str("{reset}");
     output.push_str(&variables.get("VCP_SUFFIX").unwrap());
 
     Ok(output)
@@ -276,9 +238,10 @@ fn print_usage(program: &str, opts: Options) {
     eprint!("{}", opts.usage(&brief));
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args = env::args().collect::<Vec<String>>();
-    let program = args[0].clone();
+fn main() -> Result<()> {
+    let mut args = env::args();
+    let program = args.next().context("Error getting cli args")?;
+
     let mut opts = Options::new();
     // Build options object
     opts.optflag("h", "help", "print this help message and exit")
@@ -289,10 +252,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "increase debug verbosity (-v, -vv, -vvv, etc.)",
         )
         // program options
-        // .optopt("d", "dir", "run on this dir instead of cwd", "DIR")
         .optflag("m", "minimal", "use minimal format instead of full")
         .optflag("t", "test", "use test function");
-    let matches = match opts.parse(&args[1..]) {
+    let matches = match opts.parse(args) {
         Ok(m) => m,
         Err(e) => {
             eprintln!("{}\n\n{}", e, opts.short_usage(&program));
@@ -318,7 +280,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ))
     .init();
 
-    debug!("Running with args: {:?}", &args[1..]);
+    // TODO: check to see if this is only executed when
+    // log level == debug
+    debug!("Run with args: {:?}", std::env::args());
+
     let style = if matches.opt_present("m") {
         OutputStyle::Minimal
     } else {
