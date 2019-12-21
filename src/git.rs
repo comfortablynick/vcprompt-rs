@@ -1,6 +1,6 @@
 //! Get Git status
-use crate::{status::Status, util::exec, vcs::VCS};
-use anyhow::{format_err, Context, Result};
+use crate::{status::Status, util::exec_cmd, vcs::VCS};
+use anyhow::{Context, Result};
 use std::path::PathBuf;
 
 static OPERATIONS: [(&str, &str); 6] = [
@@ -23,7 +23,7 @@ pub fn status(rootdir: PathBuf) -> Result<Status> {
 // fn get_diff() -> Result<>
 /// Run `git status` and return its output.
 fn get_status() -> Result<String> {
-    let result = exec(&[
+    let result = exec_cmd(&[
         "git",
         "status",
         "--porcelain=2",
@@ -31,11 +31,7 @@ fn get_status() -> Result<String> {
         "--untracked-files=normal",
     ])
     .context("Failed to execute \"git\"")?;
-    let output = String::from_utf8_lossy(&result.stdout).into_owned();
-    if !result.status.success() {
-        format_err!("git status failed: {}", output);
-    }
-    Ok(output)
+    Ok(result.stdout)
 }
 
 /// Parse the output string of `get_status()`.

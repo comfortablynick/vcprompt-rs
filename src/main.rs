@@ -5,10 +5,13 @@ mod status;
 mod util;
 mod vcs;
 
-use crate::{format::OutputStyle, util::globals::*, vcs::VCContext};
+use crate::{
+    format::OutputStyle,
+    util::{globals::*, logger::*},
+    vcs::VCContext,
+};
 use anyhow::{Context, Result};
 use getopts::Options;
-use log::debug;
 use std::env;
 
 fn print_usage(program: &str, opts: Options) {
@@ -57,17 +60,9 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    env_logger::Builder::from_env(env_logger::Env::new().default_filter_or(
-        match matches.opt_count("v") {
-            0 => "warn",
-            1 => "info",
-            2 => "debug",
-            _ => "trace",
-        },
-    ))
-    .init();
+    init_logger(matches.opt_count("v") as u8);
 
-    // debug!("Run with args: {:?}", std::env::args());
+    debug!("Run with args: {:?}", std::env::args());
 
     let style = if matches.opt_present("m") {
         OutputStyle::Minimal

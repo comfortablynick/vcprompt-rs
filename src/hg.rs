@@ -1,7 +1,10 @@
 //! Get Mercurial (hg) status
-use crate::{status::Status, util::exec, vcs::VCS};
+use crate::{
+    status::Status,
+    util::{exec, logger::*},
+    vcs::VCS,
+};
 use anyhow::{format_err, Context, Result};
-use log::debug;
 use std::{fs::File, io::prelude::*, path::PathBuf};
 
 /// Get the status for the cwd

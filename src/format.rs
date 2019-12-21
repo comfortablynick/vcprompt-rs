@@ -1,6 +1,8 @@
-use crate::{status::Status, util::globals::*};
+use crate::{
+    status::Status,
+    util::{globals::*, logger::*},
+};
 use anyhow::Result;
-use log::debug;
 use std::{collections::HashMap, env};
 
 /// Available formatting styles
@@ -27,7 +29,7 @@ pub fn get_output(
         ("VCP_BEHIND", "⇣{value}"),
         ("VCP_AHEAD", "⇡{value}"),
         ("VCP_STAGED", "{blue}●{value}"),
-        ("VCP_CHANGED", "{yellow}✚{value}"),
+        ("VCP_CHANGED", "{yellow}Δ{value}"), // ✚
         ("VCP_CONFLICTS", "{red}‼{value}"),
         ("VCP_UNTRACKED", "{gray}…{value}"),
         ("VCP_CLEAN", "{green}{bold}✔"),
@@ -81,7 +83,7 @@ fn format_from_string(
                         &variables
                             .get("VCP_COMMIT")
                             .unwrap()
-                            .replace("{value}", &status.commit[..7]),
+                            .replace("{value}", status.fmt_commit(7)),
                     ),
                     'A' => {
                         if status.ahead > 0 {

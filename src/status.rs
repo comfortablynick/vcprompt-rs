@@ -49,4 +49,12 @@ impl Status {
     pub fn is_clean(&self) -> bool {
         (self.staged == 0 && self.conflicts == 0 && self.changed == 0 && self.untracked == 0)
     }
+
+    /// Format commit hash
+    pub fn fmt_commit(&self, len: usize) -> &str {
+        if self.commit != "(initial)" {
+            return &self.commit[..len];
+        }
+        &self.commit
+    }
 }
