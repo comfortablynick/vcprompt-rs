@@ -17,61 +17,6 @@ pub mod globals {
         ("{black_on_green}", "\x1B[48;5;2m\x1B[30m"),
     ];
 }
-use anyhow::{format_err, Context, Result};
-use std::{
-    process::{Command, Output, Stdio},
-    str,
-};
-
-/// Spawn subprocess for `cmd` and access stdout/stderr
-///
-/// Fails if process output != 0
-pub fn exec(cmd: &[&str]) -> Result<Output> {
-    let command = Command::new(&cmd[0])
-        .args(cmd.get(1..).context("missing args in command")?)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
-    let result = command.wait_with_output()?;
-
-    if !result.status.success() {
-        format_err!(
-            "{}",
-            str::from_utf8(&result.stderr)
-                .unwrap_or("cmd returned non-zero status")
-                .trim_end()
-        );
-    }
-    Ok(result)
-}
-
-#[derive(Debug)]
-pub struct CommandOutput {
-    pub stdout: String,
-    pub stderr: String,
-}
-
-/// Execute a command and return the output on stdout and stderr if sucessful
-pub fn exec_cmd(cmd: &[&str]) -> Result<CommandOutput> {
-    log::debug!("Executing command '{:?}'", cmd);
-    let output = Command::new(&cmd[0])
-        .args(cmd.get(1..).context("missing args in command")?)
-        .output()?;
-    let stdout_string = String::from_utf8(output.stdout)?;
-    let stderr_string = String::from_utf8(output.stderr)?;
-
-    if !output.status.success() {
-        log::warn!("Non-zero exit code '{:?}'", output.status.code());
-        log::debug!("stdout: {}", stdout_string);
-        log::debug!("stderr: {}", stderr_string);
-        format_err!("Failed to execute \"cmd[0]\": {}", stderr_string.trim_end());
-    }
-
-    Ok(CommandOutput {
-        stdout: stdout_string,
-        stderr: stderr_string,
-    })
-}
 
 pub mod logger {
     // Format output of env_logger buffer

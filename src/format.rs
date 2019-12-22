@@ -24,6 +24,7 @@ pub fn get_output(
         ("VCP_SEPARATOR", "{reset}|"),
         ("VCP_NAME", "{symbol}"),
         ("VCP_BRANCH", "{cyan}{value}{reset}"),
+        ("VCP_DIFF", "{value}"),
         ("VCP_COMMIT", "{black_on_green}{value}{reset}"),
         ("VCP_OPERATION", "{red}{value}{reset}"),
         ("VCP_BEHIND", "⇣{value}"),
@@ -85,6 +86,14 @@ fn format_from_string(
                             .unwrap()
                             .replace("{value}", status.fmt_commit(7)),
                     ),
+                    'd' => {
+                        output.push_str(
+                            &variables
+                                .get("VCP_DIFF")
+                                .unwrap()
+                                .replace("{value}", &status.fmt_diff().unwrap_or_default()),
+                        );
+                    }
                     'A' => {
                         if status.ahead > 0 {
                             output.push_str(

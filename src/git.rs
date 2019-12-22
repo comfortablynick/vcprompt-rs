@@ -1,7 +1,7 @@
 //! Get Git status
-use crate::{status::Status, util::exec_cmd, vcs::VCS};
-use anyhow::{Context, Result};
-use std::path::PathBuf;
+use crate::{status::Status, vcs::VCS};
+use anyhow::{format_err, Context, Result};
+use std::{path::PathBuf, process::Command};
 
 static OPERATIONS: [(&str, &str); 6] = [
     ("rebase-merge", "REBASE"),
@@ -14,24 +14,47 @@ static OPERATIONS: [(&str, &str); 6] = [
 
 /// Get the status for the cwd
 pub fn status(rootdir: PathBuf) -> Result<Status> {
-    let status = get_status()?;
-    let mut result = parse_status(&status)?;
+    let status_output = get_status()?;
+    let diff_output = git_diff_numstat()?;
+    let mut result = parse_status(&status_output)?;
+    parse_diff(&diff_output, &mut result);
     get_operations(&mut result.operations, &rootdir);
     Ok(result)
 }
 
-// fn get_diff() -> Result<>
+fn git_diff_numstat() -> Result<String> {
+    let cmd = Command::new("git")
+        .args(&["diff", "--numstat"])
+        .output()
+        .context("error calling `git diff --numstat`")?;
+    let output = String::from_utf8(cmd.stdout).unwrap_or_default();
+    Ok(output)
+}
+
+fn parse_diff(diff: &str, status: &mut Status) {
+    for line in diff.lines() {
+        let mut split = line.split_whitespace();
+        status.added += split.next().unwrap_or_default().parse().unwrap_or(0);
+        status.deleted += split.next().unwrap_or_default().parse().unwrap_or(0);
+    }
+}
+
 /// Run `git status` and return its output.
 fn get_status() -> Result<String> {
-    let result = exec_cmd(&[
-        "git",
-        "status",
-        "--porcelain=2",
-        "--branch",
-        "--untracked-files=normal",
-    ])
-    .context("Failed to execute \"git\"")?;
-    Ok(result.stdout)
+    let result = Command::new("git")
+        .args(&[
+            "status",
+            "--porcelain=2",
+            "--branch",
+            "--untracked-files=normal",
+        ])
+        .output()
+        .context("Failed to execute \"git\"")?;
+    let stdout = String::from_utf8_lossy(&result.stdout).into_owned();
+    if !result.status.success() {
+        format_err!("hg status failed: {}", stdout);
+    }
+    Ok(stdout)
 }
 
 /// Parse the output string of `get_status()`.

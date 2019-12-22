@@ -23,6 +23,10 @@ pub struct Status {
     pub untracked:  u32,
     /// Number of conflicts
     pub conflicts:  u32,
+    /// Number added chunks
+    pub added:      u32,
+    /// Number deleted chunks
+    pub deleted:    u32,
     /// Ongoing operations (e.g., merging)
     pub operations: Vec<&'static str>,
 }
@@ -41,6 +45,8 @@ impl Status {
             changed:    0,
             untracked:  0,
             conflicts:  0,
+            added:      0,
+            deleted:    0,
             operations: vec![],
         }
     }
@@ -56,5 +62,23 @@ impl Status {
             return &self.commit[..len];
         }
         &self.commit
+    }
+
+    /// Format diff numstat
+    pub fn fmt_diff(&self) -> Option<String> {
+        if self.changed == 0 {
+            return None;
+        }
+        let mut s = String::with_capacity(10);
+        if self.added > 0 {
+            // write!(buf, "+{}", self.insertions)?;
+            s.push('+');
+            s.push_str(&self.added.to_string());
+            if self.deleted > 0 {
+                s.push_str("/-");
+                s.push_str(&self.deleted.to_string());
+            }
+        }
+        Some(s)
     }
 }

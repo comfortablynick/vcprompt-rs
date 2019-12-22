@@ -1,11 +1,7 @@
 //! Get Mercurial (hg) status
-use crate::{
-    status::Status,
-    util::{exec, logger::*},
-    vcs::VCS,
-};
+use crate::{status::Status, util::logger::*, vcs::VCS};
 use anyhow::{format_err, Context, Result};
-use std::{fs::File, io::prelude::*, path::PathBuf};
+use std::{fs::File, io::prelude::*, path::PathBuf, process::Command};
 
 /// Get the status for the cwd
 pub fn status(rootdir: PathBuf) -> Result<Status> {
@@ -18,7 +14,9 @@ pub fn status(rootdir: PathBuf) -> Result<Status> {
 
 /// Run `hg status` and return its output.
 fn get_status() -> Result<String> {
-    let result = exec(&["hg", "status", "--color=false", "--pager=false"])
+    let result = Command::new("hg")
+        .args(&["hg", "status", "--color=false", "--pager=false"])
+        .output()
         .context("Failed to execute \"hg\"")?;
     let output = String::from_utf8_lossy(&result.stdout).into_owned();
 
