@@ -37,7 +37,7 @@ impl Status {
         Status {
             name:       vcs,
             symbol:     vcs.default_symbol().to_owned(),
-            branch:     String::with_capacity(40),
+            branch:     "<unknown>".to_owned(),
             commit:     String::with_capacity(40), // Should be max length of git commit hash
             ahead:      0,
             behind:     0,

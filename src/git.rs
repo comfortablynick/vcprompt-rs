@@ -1,7 +1,11 @@
 //! Get Git status
-use crate::{status::Status, vcs::VCS};
-use anyhow::{format_err, Context, Result};
-use std::{path::PathBuf, process::Command};
+use crate::{
+    status::Status,
+    util::{exec_cmd, CommandOutput},
+    vcs::VCS,
+};
+use anyhow::{Context, Result};
+use std::path::PathBuf;
 
 static OPERATIONS: [(&str, &str); 6] = [
     ("rebase-merge", "REBASE"),
@@ -16,19 +20,14 @@ static OPERATIONS: [(&str, &str); 6] = [
 pub fn status(rootdir: PathBuf) -> Result<Status> {
     let status_output = get_status()?;
     let diff_output = git_diff_numstat()?;
-    let mut result = parse_status(&status_output)?;
-    parse_diff(&diff_output, &mut result);
+    let mut result = parse_status(&status_output.stdout)?;
+    parse_diff(&diff_output.stdout, &mut result);
     get_operations(&mut result.operations, &rootdir);
     Ok(result)
 }
 
-fn git_diff_numstat() -> Result<String> {
-    let cmd = Command::new("git")
-        .args(&["diff", "--numstat"])
-        .output()
-        .context("error calling `git diff --numstat`")?;
-    let output = String::from_utf8(cmd.stdout).unwrap_or_default();
-    Ok(output)
+fn git_diff_numstat() -> Result<CommandOutput> {
+    exec_cmd("git", &["diff", "--numstat"])
 }
 
 fn parse_diff(diff: &str, status: &mut Status) {
@@ -40,21 +39,17 @@ fn parse_diff(diff: &str, status: &mut Status) {
 }
 
 /// Run `git status` and return its output.
-fn get_status() -> Result<String> {
-    let result = Command::new("git")
-        .args(&[
+fn get_status() -> Result<CommandOutput> {
+    exec_cmd(
+        "git",
+        &[
             "status",
             "--porcelain=2",
             "--branch",
             "--untracked-files=normal",
-        ])
-        .output()
-        .context("Failed to execute \"git\"")?;
-    let stdout = String::from_utf8_lossy(&result.stdout).into_owned();
-    if !result.status.success() {
-        format_err!("hg status failed: {}", stdout);
-    }
-    Ok(stdout)
+        ],
+    )
+    // .ok_or_else(|| format_err!("Command failed: `git status'"))
 }
 
 /// Parse the output string of `get_status()`.
@@ -160,6 +155,7 @@ u UU <sub> <m1> <m2> <m3> <mW> <h1> <h2> <h3> <path>
 ";
         let mut expected = Status::new(VCS::Git);
         expected.branch = "master".to_owned();
+        expected.commit = "dc716b061d9a0bc6a59f4e02d72b9952cce28927".to_owned();
         expected.ahead = 1;
         expected.behind = 2;
         expected.staged = 14;
@@ -177,11 +173,12 @@ u UU <sub> <m1> <m2> <m3> <mW> <h1> <h2> <h3> <path>
 ";
         let mut expected = Status::new(VCS::Git);
         expected.branch = "master".to_owned();
+        expected.commit = "dc716b061d9a0bc6a59f4e02d72b9952cce28927".to_owned();
         assert_eq!(parse_status(output).unwrap(), expected);
     }
 
     #[test]
-    fn parse_status_emty() {
+    fn parse_status_empty() {
         assert_eq!(parse_status("").unwrap(), Status::new(VCS::Git));
     }
 

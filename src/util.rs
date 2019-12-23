@@ -1,4 +1,7 @@
 //! Commonly used utilities
+use anyhow::{format_err, Result};
+use std::process::Command;
+
 pub mod globals {
     pub const VERSION: &str = env!("CARGO_PKG_VERSION");
     pub const DESCRIPTION: &str = env!("CARGO_PKG_DESCRIPTION");
@@ -16,6 +19,46 @@ pub mod globals {
         ("{white}", "\x1B[37m"),
         ("{black_on_green}", "\x1B[48;5;2m\x1B[30m"),
     ];
+}
+
+#[derive(Debug)]
+pub struct CommandOutput {
+    pub stdout: String,
+    pub stderr: String,
+}
+
+impl PartialEq for CommandOutput {
+    fn eq(&self, other: &Self) -> bool {
+        self.stdout == other.stdout && self.stderr == other.stderr
+    }
+}
+
+/// Execute a command and return the output on stdout and stderr if sucessful
+///
+/// Most of this borrowed from Starship
+/// https://github.com/starship/starship/blob/master/src/utils.rs
+///
+/// If no arguments, pass empty array slice `&[]`
+pub fn exec_cmd(cmd: &str, args: &[&str]) -> Result<CommandOutput> {
+    log::trace!("Executing command '{:?}' with args '{:?}'", cmd, args);
+    let output = Command::new(cmd).args(args).output()?;
+    let stdout_string = String::from_utf8(output.stdout).unwrap_or_default();
+    let stderr_string = String::from_utf8(output.stderr).unwrap_or_default();
+
+    if !output.status.success() {
+        log::trace!("Non-zero exit code '{:?}'", output.status.code());
+        log::trace!("stdout: {}", stdout_string);
+        log::trace!("stderr: {}", stderr_string);
+        return Err(format_err!(
+            "Command failed: `{}': {}",
+            stdout_string,
+            stderr_string
+        ));
+    }
+    Ok(CommandOutput {
+        stdout: stdout_string,
+        stderr: stderr_string,
+    })
 }
 
 pub mod logger {
@@ -90,5 +133,54 @@ pub mod logger {
             )
         })
         .init();
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn exec_no_output() {
+        let result = exec_cmd("true", &[]).unwrap();
+        let expected = CommandOutput {
+            stdout: String::from(""),
+            stderr: String::from(""),
+        };
+        assert_eq!(result, expected)
+    }
+
+    #[test]
+    fn exec_with_output_stdout() {
+        let result = exec_cmd("/bin/echo", &["-n", "hello"]).unwrap();
+        let expected = CommandOutput {
+            stdout: String::from("hello"),
+            stderr: String::from(""),
+        };
+        assert_eq!(result, expected)
+    }
+
+    #[test]
+    fn exec_with_output_stderr() {
+        let result = exec_cmd("/bin/sh", &["-c", "echo hello >&2"]).unwrap();
+        let expected = CommandOutput {
+            stdout: String::from(""),
+            stderr: String::from("hello\n"),
+        };
+        assert_eq!(result, expected)
+    }
+
+    #[test]
+    fn exec_with_output_both() {
+        let result = exec_cmd("/bin/sh", &["-c", "echo hello; echo world >&2"]).unwrap();
+        let expected = CommandOutput {
+            stdout: String::from("hello\n"),
+            stderr: String::from("world\n"),
+        };
+        assert_eq!(result, expected)
+    }
+
+    #[test]
+    fn exec_with_non_zero_exit_code() {
+        let result = exec_cmd("false", &[]);
+        assert!(result.is_err(), "Result wasn't an error")
     }
 }
